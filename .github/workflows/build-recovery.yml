@@ -18,10 +18,6 @@ on:
           - 'Catalina'
           - 'Mojave'
           - 'High Sierra'
-      release_tag:
-        description: 'Optional: tag the build (e.g., v10.15) to upload it to Releases for long-term storage'
-        required: false
-        type: string
 
 jobs:
   preflight:
@@ -182,35 +178,16 @@ jobs:
           zip -j "$ZIP_FILE" "$ISO_FILE"
           echo "compressed_file=$ZIP_FILE" >> $GITHUB_OUTPUT
 
-      - name: Upload Recovery ISO artifact
-        uses: actions/upload-artifact@v7
-        with:
-          path: ${{ steps.compress_iso.outputs.compressed_file }}
-          compression-level: 0
-          retention-days: 15
-          archive: false
-
-      - name: Sanitize release tag
-        id: sanitize_tag
-        if: github.event.inputs.release_tag != ''
+      - name: Publish Release
+        id: release
         env:
-          RAW_TAG: ${{ github.event.inputs.release_tag }}
-        run: |
-          sanitized_tag=$(printf '%s' "$RAW_TAG" | sed 's/[^a-zA-Z0-9._-]/-/g' | sed 's/--*/-/g' | sed 's/^-//;s/-$//')
-          echo "sanitized_tag=$sanitized_tag" >> $GITHUB_OUTPUT
-
-      - name: Create Release
-        if: github.event.inputs.release_tag != ''
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION_NAME: ${{ steps.version_info.outputs.version_name }}
-          TAG: ${{ steps.sanitize_tag.outputs.sanitized_tag }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version_info.outputs.version_name }}
           ASSET: ${{ steps.compress_iso.outputs.compressed_file }}
-        continue-on-error: true
         run: |
-          gh release create "$TAG" \
-            --title "macOS ${VERSION_NAME} Recovery" \
-            "$ASSET"
+          version_slug=$(printf '%s' "$VERSION" | tr '[:upper:]_' '[:lower:]-')
+          tag="macos-${version_slug}-recovery-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          bash .github/scripts/publish-release.sh "$ASSET" "$tag" "macOS ${VERSION} Recovery"
 
       - name: Summary
         if: always()
@@ -229,5 +206,5 @@ jobs:
                 "> This ISO image is intended for creating macOS virtual machine on Proxmox VE, QEMU, and VMware." \
                 "" \
                 "> [!TIP]" \
-                "> Enable [Cloudflare WARP](https://one.one.one.one/) for faster download from GitHub artifact."
+                "> Enable [Cloudflare WARP](https://one.one.one.one/) for faster download from GitHub Releases."
           fi

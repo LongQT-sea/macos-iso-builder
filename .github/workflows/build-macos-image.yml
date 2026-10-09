@@ -94,6 +94,8 @@ jobs:
     if: needs.preflight.outputs._build == 'true'
     runs-on: macos-15-intel
     timeout-minutes: 80
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout repository
@@ -120,13 +122,17 @@ jobs:
             echo "image_name=$(basename *.dmg.img)" >> $GITHUB_OUTPUT
           fi
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v7
-        with:
-          path: ${{ steps.create_image.outputs.image_name }}
-          compression-level: 0
-          retention-days: 15
-          archive: false
+      - name: Publish Release
+        id: release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ASSET: ${{ steps.create_image.outputs.image_name }}
+          VERSION: ${{ inputs.macos_version }}
+          FORMAT: ${{ inputs.image_format }}
+        run: |
+          version_slug=$(printf '%s' "$VERSION" | tr '[:upper:] ' '[:lower:]-')
+          tag="macos-${version_slug}-${FORMAT}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          bash .github/scripts/publish-release.sh "$ASSET" "$tag" "macOS ${VERSION} ${FORMAT}"
 
       - name: Summary
         if: always()
@@ -152,5 +158,5 @@ jobs:
             fi
             sum "" \
                 "> [!TIP]" \
-                "> Enable [Cloudflare WARP](https://one.one.one.one/) for faster download from GitHub artifact."
+                "> Enable [Cloudflare WARP](https://one.one.one.one/) for faster download from GitHub Releases."
           fi
