@@ -1,0 +1,53 @@
+name: Clean up old GHCR packages
+
+# Keeps GHCR storage from growing without bound: every scheduled run keeps the
+# newest N versions of each macos-* package and deletes the rest.
+#
+# Deleting package versions needs the `delete:packages` scope, which the
+# workflow GITHUB_TOKEN does NOT have. Create a classic PAT with that scope and
+# store it as the GHCR_GC_TOKEN repository secret. Without the secret the job
+# only warns and does nothing.
+
+on:
+  schedule:
+    - cron: '0 4 * * 0'   # every Sunday at 04:00 UTC
+  workflow_dispatch:
+    inputs:
+      keep:
+        description: 'How many newest versions to keep per package'
+        required: false
+        default: '5'
+      dry_run:
+        description: 'List what would be deleted without deleting'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-slim
+    timeout-minutes: 15
+    env:
+      GITHUB_REPOSITORY: ${{ github.repository }}
+      GH_TOKEN: ${{ secrets.GHCR_GC_TOKEN }}
+      KEEP: ${{ github.event.inputs.keep || '5' }}
+      # Scheduled runs delete; manual runs default to a dry run.
+      DRY_RUN: ${{ github.event_name == 'schedule' && '0' || (github.event.inputs.dry_run == 'false' && '0' || '1') }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Check for token
+        run: |
+          if [ -z "${GH_TOKEN}" ]; then
+            echo "::warning::GHCR_GC_TOKEN secret is not set - skipping package cleanup. Add a classic PAT with the delete:packages scope to enable it."
+            echo "skip=1" >> "$GITHUB_ENV"
+          fi
+
+      - name: Delete old package versions
+        if: env.skip != '1'
+        run: bash .github/scripts/cleanup-ghcr.sh

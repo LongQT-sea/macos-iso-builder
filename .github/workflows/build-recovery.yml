@@ -83,6 +83,7 @@ jobs:
     permissions:
       contents: write
       packages: write
+      id-token: write   # keyless cosign signing
 
     steps:
       - name: Checkout repository
@@ -182,12 +183,16 @@ jobs:
       - name: Install oras
         uses: oras-project/setup-oras@v2
 
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
       - name: Publish to GHCR
         id: release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ steps.version_info.outputs.version_name }}
           ASSET: ${{ steps.compress_iso.outputs.compressed_file }}
+          COMPRESS: ${{ vars.GHCR_COMPRESS }}
         run: |
           version_slug=$(printf '%s' "$VERSION" | tr '[:upper:]_' '[:lower:]-')
           package="macos-${version_slug}"
