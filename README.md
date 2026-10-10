@@ -59,7 +59,7 @@ Lion, Mountain Lion, Mavericks, Yosemite, El Capitan, Sierra, High Sierra, Mojav
    * **Image format** – Choose `iso` for virtual machines or `dmg` for bootable USB drives.
 6. Click the green **"Run workflow"** button to start the build, then wait for the workflow to complete.
 7. Once completed, open the **Releases** page in your repository (or follow the release link in the workflow summary) and download the files. Each build automatically creates a published release with a unique tag; it is never a draft or pre-release.
-8. Large images are split into `.part001`, `.part002`, etc. Download every part and follow the commands in the release notes to combine them. **Recovery ISO** files are zipped — unzip before use.
+8. Large images are split into `.part001`, `.part002`, etc. Run the one-line command in that specific release’s notes to download and combine its exact assets, verify its SHA-256, and automatically remove temporary split files. The command requires Bash and curl on Linux or macOS. **Recovery ISO** files are zipped — unzip before use.
 
 ---
 

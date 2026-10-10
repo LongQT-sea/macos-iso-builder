@@ -11,13 +11,20 @@ printf 'Built from commit `%s`.\n' "$GITHUB_SHA" > "$notes"
 
 # Release assets must be smaller than 2 GiB. Use portable Python splitting
 # because the macOS runner ships BSD utilities.
-python3 - "$asset" "$release_dir" <<'PY'
+python3 - "$asset" "$release_dir" "$GITHUB_REPOSITORY" "$tag" <<'PY'
+import hashlib
 import pathlib
+import shlex
+import urllib.parse
 import shutil
 import sys
 
 source = pathlib.Path(sys.argv[1])
 destination = pathlib.Path(sys.argv[2])
+digest = hashlib.sha256()
+with source.open('rb') as stream:
+    for block in iter(lambda: stream.read(8 * 1024 * 1024), b''):
+        digest.update(block)
 limit = 1900 * 1024 * 1024
 if source.stat().st_size <= limit:
     shutil.move(str(source), str(destination / source.name))
@@ -34,12 +41,42 @@ else:
                     part.write(block)
                     remaining -= len(block)
             index += 1
+# Pin every URL and checksum to this release, including the helper itself.
+base_url = f'https://github.com/{sys.argv[3]}/releases/download/{urllib.parse.quote(sys.argv[4], safe="")}'
+files = sorted(path.name for path in destination.iterdir() if path.name != 'notes.md')
+quote = shlex.quote
+lines = [
+    '#!/usr/bin/env bash',
+    'set -euo pipefail',
+    f'name={quote(source.name)}',
+    '[ ! -e "$name" ] || { echo "Output already exists: $name" >&2; exit 1; }',
+    'work=$(mktemp -d "./.macos-download.XXXXXX")',
+    "trap 'rm -rf -- \"$work\"' EXIT",
+]
+for name in files:
+    url = base_url + '/' + urllib.parse.quote(name, safe='')
+    lines.append(f'curl --fail --location --retry 3 --output "$work"/{quote(name)} {quote(url)}')
+parts = ' '.join('"$work"/' + quote(name) for name in files)
+lines += [
+    f'cat {parts} > "$work/image"',
+    'if command -v sha256sum >/dev/null 2>&1; then',
+    '  actual=$(sha256sum "$work/image"); actual=${actual%% *}',
+    'else',
+    '  actual=$(shasum -a 256 "$work/image"); actual=${actual%% *}',
+    'fi',
+    f'[ "$actual" = {quote(digest.hexdigest())} ] || {{ echo "SHA-256 mismatch" >&2; exit 1; }}',
+    'mv -n -- "$work/image" "$name"',
+    '[ ! -e "$work/image" ] || { echo "Output already exists: $name" >&2; exit 1; }',
+    'printf "Downloaded and verified: %s\\n" "$name"',
+]
+(destination / 'download.sh').write_text('\n'.join(lines) + '\n')
+command = f'curl -fsSL {quote(base_url + "/download.sh")} | bash'
+with (destination / 'notes.md').open('a') as notes:
+    notes.write('\nDownload, combine all parts, verify SHA-256, and remove temporary split files (Linux/macOS; Bash and curl required):\n\n```bash\n' + command + '\n```\n')
+    notes.write(f'\nSHA-256 (`{source.name}`): `{digest.hexdigest()}`\n')
+    if source.name.endswith('.zip'):
+        notes.write('\nUnzip the downloaded archive before use.\n')
 PY
-
-if [ -f "$release_dir/$asset_name.part001" ]; then
-  printf '\nDownload all parts into the same folder, then combine them before use:\n\n```bash\ncat "%s".part* > "%s"\n```\n\nWindows (Command Prompt):\n\n```bat\ncopy /b "%s.part*" "%s"\n```\n' \
-    "$asset_name" "$asset_name" "$asset_name" "$asset_name" >> "$notes"
-fi
 
 assets=()
 for file in "$release_dir"/*; do
