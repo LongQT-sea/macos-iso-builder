@@ -3,10 +3,12 @@
 #
 # The heavy image (ISO/DMG, up to ~18 GB) does NOT go to GitHub Releases.
 # Instead it is chunked into raw byte parts of at most CHUNK_LIMIT bytes and
-# pushed to the GitHub Container Registry as ONE OCI artifact
-# (`ghcr.io/<owner>/<repo>:<tag>`). GHCR has a 10 GB per-layer limit and a
-# ~10 minute upload timeout, so parts are kept below that (5 GiB): fewer parts
-# than the 2 GiB limit Releases imposes, and a safer upload.
+# pushed to the GitHub Container Registry as ONE OCI artifact under a
+# per-macOS-version package, e.g. `ghcr.io/<owner>/macos-tahoe:<tag>` (ISO/DMG
+# and Recovery for one version share that package, distinguished by tag).
+# GHCR has a 10 GB per-layer limit and a ~10 minute upload timeout, so parts
+# are kept below that (5 GiB): fewer parts than the 2 GiB limit Releases
+# imposes, and a safer upload.
 #
 # The GitHub Release created here is "thin": its only asset is a tiny
 # `download.sh` that fetches the parts from GHCR with plain curl (works for
@@ -14,18 +16,26 @@
 # merges them locally (`cat part... > image`) and verifies the SHA-256. The
 # merged result is byte-identical to the ISO/DMG built on the runner.
 #
-# Usage: publish-ghcr.sh <asset> <tag> <title>
+# NOTE: a package whose name differs from the repository is NOT auto-linked,
+# so its visibility defaults to private. Set it to Public once (or link it to
+# this repository) or anonymous downloads will fail with 401.
+#
+# Usage: publish-ghcr.sh <asset> <package> <tag> <title>
+#   e.g. publish-ghcr.sh Tahoe.iso macos-tahoe macos-tahoe-iso-123-1 "macOS Tahoe iso"
 # Env:   GH_TOKEN/GITHUB_TOKEN, GITHUB_REPOSITORY, GITHUB_ACTOR, GITHUB_SHA,
 #        GITHUB_OUTPUT, GITHUB_STEP_SUMMARY
 set -euo pipefail
 
 asset=$1
-tag=$2
-title=$3
+package=$2
+tag=$3
+title=$4
 
 # NOTE: bash on the macOS runner is 3.2 - no ${var,,}; lowercase via tr.
 repo=$(printf '%s' "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')
-image_ref="${repo}:${tag}"
+owner=${repo%%/*}
+package_path="${owner}/${package}"
+image_ref="${package_path}:${tag}"
 asset_name=$(basename "$asset")
 CHUNK_LIMIT=$((5 * 1024 * 1024 * 1024)) # 5 GiB, well under GHCR's 10 GB/layer
 
@@ -137,7 +147,7 @@ echo "verified: ${#part_digests[@]} blob(s) present in ghcr.io/${image_ref}"
 #    curl + sha256sum/shasum. It pulls each chunk by digest from the GHCR
 #    registry API, concatenates them and verifies the full asset's SHA-256.
 # ---------------------------------------------------------------------------
-python3 - "$release_dir/download.sh" "$asset_name" "$repo" "$main_digest" "$release_dir/parts.txt" <<'PY'
+python3 - "$release_dir/download.sh" "$asset_name" "$package_path" "$main_digest" "$release_dir/parts.txt" <<'PY'
 import pathlib
 import shlex
 import sys
@@ -214,9 +224,11 @@ PY
 # 4) Thin GitHub Release: ONLY download.sh + notes with the one-liner.
 # ---------------------------------------------------------------------------
 command="curl -fsSL https://github.com/${repo}/releases/download/${tag}/download.sh | bash"
+part_word="parts"
+[ "${#part_names[@]}" -eq 1 ] && part_word="part"
 {
   printf '\nDownload, merge all parts locally, and verify SHA-256 (Linux/macOS; curl and sha256sum/shasum required):\n\n```bash\n%s\n```\n' "$command"
-  printf '\nThe image was not uploaded as Release assets: it lives on **GitHub Container Registry** (`ghcr.io/%s`), split into **%s parts** (each < 10 GB). `download.sh` pulls them, merges them, and verifies the SHA-256.\n' "$image_ref" "${#part_names[@]}"
+  printf '\nThe image was not uploaded as Release assets: it lives on **GitHub Container Registry** (`ghcr.io/%s`), split into **%s %s** (each < 10 GB). `download.sh` pulls them, merges them, and verifies the SHA-256.\n' "$image_ref" "${#part_names[@]}" "$part_word"
   printf '\nSHA-256 (`%s`): `%s`\n' "$asset_name" "$main_digest"
   if [ "${asset_name##*.}" = "zip" ]; then
     printf '\nUnzip the downloaded archive before use.\n'

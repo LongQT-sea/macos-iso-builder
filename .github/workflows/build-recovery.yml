@@ -190,8 +190,9 @@ jobs:
           ASSET: ${{ steps.compress_iso.outputs.compressed_file }}
         run: |
           version_slug=$(printf '%s' "$VERSION" | tr '[:upper:]_' '[:lower:]-')
+          package="macos-${version_slug}"
           tag="macos-${version_slug}-recovery-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          bash .github/scripts/publish-ghcr.sh "$ASSET" "$tag" "macOS ${VERSION} Recovery"
+          bash .github/scripts/publish-ghcr.sh "$ASSET" "$package" "$tag" "macOS ${VERSION} Recovery"
 
       - name: Summary
         if: always()

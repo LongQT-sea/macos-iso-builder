@@ -135,8 +135,9 @@ jobs:
           FORMAT: ${{ inputs.image_format }}
         run: |
           version_slug=$(printf '%s' "$VERSION" | tr '[:upper:] ' '[:lower:]-')
+          package="macos-${version_slug}"
           tag="macos-${version_slug}-${FORMAT}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          bash .github/scripts/publish-ghcr.sh "$ASSET" "$tag" "macOS ${VERSION} ${FORMAT}"
+          bash .github/scripts/publish-ghcr.sh "$ASSET" "$package" "$tag" "macOS ${VERSION} ${FORMAT}"
 
       - name: Summary
         if: always()
