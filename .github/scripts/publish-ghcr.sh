@@ -22,9 +22,9 @@
 #     download stays curl-only; zstd needs to be installed on the user machine)
 #   * updates a rolling `catalog` release with a machine-readable catalog.json
 #
-# NOTE: a package whose name differs from the repository is NOT auto-linked, so
-# its visibility defaults to private. Set it to Public once (or link it to this
-# repository) or anonymous downloads fail with 401.
+# NOTE: packages pushed from a workflow with GITHUB_TOKEN are auto-linked to the
+# repository and inherit its visibility. This repository is public, so the
+# packages are public and download.sh can pull them anonymously.
 #
 # Usage: publish-ghcr.sh <asset> <package> <tag> <title>
 #   e.g. publish-ghcr.sh Tahoe.iso macos-tahoe macos-tahoe-iso-123-1 "macOS Tahoe iso"
