@@ -196,10 +196,33 @@ lines = [
     '',
 ]
 
-for part_name, part_digest in parts:
-    blob_url = f'https://ghcr.io/v2/{repo}/blobs/sha256:{part_digest}'
-    lines.append(f'curl --fail --location --retry 3 --retry-all-errors -H "Authorization: Bearer $token" \\')
-    lines.append(f'  -o "$work"/{quote(part_name)} {quote(blob_url)}')
+curl_common = 'curl --fail --location --retry 3 --retry-all-errors -H "Authorization: Bearer $token"'
+
+blob_urls = [
+    (part_name, f'https://ghcr.io/v2/{repo}/blobs/sha256:{part_digest}')
+    for part_name, part_digest in parts
+]
+
+# Sequential fallback (works on any curl).
+sequential = []
+for part_name, blob_url in blob_urls:
+    sequential.append(f'{curl_common} \\')
+    sequential.append(f'  -o "$work"/{quote(part_name)} {quote(blob_url)}')
+
+# Parallel fetch of all parts (curl >= 7.66). Multiple connections usually
+# download much faster than fetching the parts one after another.
+parallel = [f'{curl_common} --parallel --parallel-max 4 \\']
+parallel += [f'  -o "$work"/{quote(part_name)} {quote(blob_url)} \\' for part_name, blob_url in blob_urls]
+parallel[-1] = parallel[-1].rstrip(' \\')  # last line has no continuation
+
+lines += [
+    '# Fetch all parts in parallel when supported, else fall back to sequential.',
+    'if curl --parallel --version >/dev/null 2>&1; then',
+]
+lines += [f'  {line}' for line in parallel]
+lines += ['else']
+lines += [f'  {line}' for line in sequential]
+lines += ['fi']
 
 merged_parts = ' '.join(f'"$work"/{quote(part_name)}' for part_name, _ in parts)
 lines += [
