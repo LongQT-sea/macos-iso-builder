@@ -20,7 +20,6 @@
 #     fine-grained resume of an interrupted run (curl -C -)
 #   * optional transfer compression: COMPRESS=zstd|gzip (default: none, so the
 #     download stays curl-only; zstd needs to be installed on the user machine)
-#   * optional keyless cosign signature (best effort; needs id-token: write)
 #   * updates a rolling `catalog` release with a machine-readable catalog.json
 #
 # NOTE: a package whose name differs from the repository is NOT auto-linked, so
@@ -183,23 +182,7 @@ done
 echo "verified: ${#part_digests[@]} blob(s) present in ghcr.io/${image_ref}"
 
 # ---------------------------------------------------------------------------
-# 3) Optional keyless cosign signature (best effort). Never block a release on
-#    it; a missing/unreachable transparency log should not lose the image.
-# ---------------------------------------------------------------------------
-signed=0
-if command -v cosign >/dev/null 2>&1; then
-    if cosign sign --yes "ghcr.io/${image_ref}"; then
-        echo "signed ghcr.io/${image_ref} with cosign (keyless)"
-        signed=1
-    else
-        echo "::warning::cosign signing failed; release continues unsigned"
-    fi
-else
-    echo "cosign not installed; skipping signature"
-fi
-
-# ---------------------------------------------------------------------------
-# 4) Generate `download.sh` - runnable on the user's machine with ONLY
+# 3) Generate `download.sh` - runnable on the user's machine with ONLY
 #    curl + sha256sum/shasum (plus zstd/gzip when COMPRESS is enabled).
 #    It pulls each chunk by digest from the GHCR registry API, concatenates
 #    them and verifies the full image's SHA-256.
@@ -242,18 +225,10 @@ lines = [
     'mkdir -p -- "$work"',
     '',
     f'repo={quote(repo)}',
-    '# Anonymous pull token works for public GHCR packages; falls back to an',
-    '# optional GITHUB_TOKEN/GH_TOKEN env var for private packages.',
+    '# Anonymous pull token for the public GHCR package.',
     'token_json=$(curl -fsSL --retry 3 --retry-all-errors \\',
-    '  "https://ghcr.io/token?service=ghcr.io&scope=repository:${repo}:pull") \\',
-    '  || token_json=""',
+    '  "https://ghcr.io/token?service=ghcr.io&scope=repository:${repo}:pull")',
     'token=$(printf \'%s\' "$token_json" | sed -n \'s/.*"token":"\\([^"]*\\)".*/\\1/p\')',
-    'if [ -z "$token" ] && [ -n "${GITHUB_TOKEN:-}" ]; then',
-    '  token_json=$(curl -fsSL --retry 3 --retry-all-errors \\',
-    '    -u "x-access-token:${GITHUB_TOKEN}" \\',
-    '    "https://ghcr.io/token?service=ghcr.io&scope=repository:${repo}:pull")',
-    '  token=$(printf \'%s\' "$token_json" | sed -n \'s/.*"token":"\\([^"]*\\)".*/\\1/p\')',
-    'fi',
     '[ -n "$token" ] || { echo "Failed to get GHCR pull token" >&2; exit 1; }',
     '',
     f'printf "Fetching {num_parts} part{plural} of $name from GHCR...\\n"',
@@ -348,7 +323,7 @@ script_path.chmod(0o755)
 PY
 
 # ---------------------------------------------------------------------------
-# 5) Thin GitHub Release: ONLY download.sh + notes with the one-liner.
+# 4) Thin GitHub Release: ONLY download.sh + notes with the one-liner.
 # ---------------------------------------------------------------------------
 command="curl -fsSL https://github.com/${repo}/releases/download/${tag}/download.sh | bash"
 part_word="parts"
@@ -360,9 +335,6 @@ part_word="parts"
     printf '\nParts are **%s-compressed** on the wire to save bandwidth; `download.sh` decompresses them automatically (requires `%s` locally).\n' "$compress" "$compress"
   fi
   printf '\nSHA-256 (`%s`): `%s`\n' "$asset_name" "$main_digest"
-  if [ "$signed" = "1" ]; then
-    printf '\nThe artifact is signed with [cosign](https://docs.sigstore.dev/) (keyless). Verify it with:\n\n```bash\ncosign verify ghcr.io/%s \\\n  --certificate-identity-regexp "^https://github.com/%s/" \\\n  --certificate-oidc-issuer https://token.actions.githubusercontent.com\n```\n' "$image_ref" "$repo"
-  fi
   if [ "${asset_name##*.}" = "zip" ]; then
     printf '\nUnzip the downloaded archive before use.\n'
   fi
@@ -382,7 +354,7 @@ printf 'release_url=%s\n' "$release_url" >> "$GITHUB_OUTPUT"
 printf '\nDownload: one-liner on the [GitHub Release](%s).\n' "$release_url" >> "$GITHUB_STEP_SUMMARY"
 
 # ---------------------------------------------------------------------------
-# 6) Refresh the rolling `catalog` release with a machine-readable index of
+# 5) Refresh the rolling `catalog` release with a machine-readable index of
 #    every build. Kept best effort: a catalog hiccup must not fail the release.
 # ---------------------------------------------------------------------------
 if [ "$compress" = none ]; then

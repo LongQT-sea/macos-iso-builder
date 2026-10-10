@@ -83,7 +83,6 @@ jobs:
     permissions:
       contents: write
       packages: write
-      id-token: write   # keyless cosign signing
 
     steps:
       - name: Checkout repository
@@ -182,9 +181,6 @@ jobs:
 
       - name: Install oras
         uses: oras-project/setup-oras@v2
-
-      - name: Install cosign
-        uses: sigstore/cosign-installer@v3
 
       - name: Publish to GHCR
         id: release
