@@ -82,6 +82,7 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: write
+      packages: write
 
     steps:
       - name: Checkout repository
@@ -178,7 +179,10 @@ jobs:
           zip -j "$ZIP_FILE" "$ISO_FILE"
           echo "compressed_file=$ZIP_FILE" >> $GITHUB_OUTPUT
 
-      - name: Publish Release
+      - name: Install oras
+        uses: oras-project/setup-oras@v2
+
+      - name: Publish to GHCR
         id: release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -187,7 +191,7 @@ jobs:
         run: |
           version_slug=$(printf '%s' "$VERSION" | tr '[:upper:]_' '[:lower:]-')
           tag="macos-${version_slug}-recovery-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          bash .github/scripts/publish-release.sh "$ASSET" "$tag" "macOS ${VERSION} Recovery"
+          bash .github/scripts/publish-ghcr.sh "$ASSET" "$tag" "macOS ${VERSION} Recovery"
 
       - name: Summary
         if: always()
@@ -206,5 +210,5 @@ jobs:
                 "> This ISO image is intended for creating macOS virtual machine on Proxmox VE, QEMU, and VMware." \
                 "" \
                 "> [!TIP]" \
-                "> Enable [Cloudflare WARP](https://one.one.one.one/) for faster download from GitHub Releases."
+                "> Copy the one-liner from the [GitHub Release](${{ steps.release.outputs.release_url }}) to download the image from **GHCR** and merge it locally."
           fi

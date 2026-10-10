@@ -96,6 +96,7 @@ jobs:
     timeout-minutes: 80
     permissions:
       contents: write
+      packages: write
 
     steps:
       - name: Checkout repository
@@ -122,7 +123,10 @@ jobs:
             echo "image_name=$(basename *.dmg.img)" >> $GITHUB_OUTPUT
           fi
 
-      - name: Publish Release
+      - name: Install oras
+        uses: oras-project/setup-oras@v2
+
+      - name: Publish to GHCR
         id: release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -132,7 +136,7 @@ jobs:
         run: |
           version_slug=$(printf '%s' "$VERSION" | tr '[:upper:] ' '[:lower:]-')
           tag="macos-${version_slug}-${FORMAT}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          bash .github/scripts/publish-release.sh "$ASSET" "$tag" "macOS ${VERSION} ${FORMAT}"
+          bash .github/scripts/publish-ghcr.sh "$ASSET" "$tag" "macOS ${VERSION} ${FORMAT}"
 
       - name: Summary
         if: always()
@@ -158,5 +162,5 @@ jobs:
             fi
             sum "" \
                 "> [!TIP]" \
-                "> Enable [Cloudflare WARP](https://one.one.one.one/) for faster download from GitHub Releases."
+                "> Copy the one-liner from the [GitHub Release](${{ steps.release.outputs.release_url }}) to download the image from **GHCR** and merge it locally."
           fi
