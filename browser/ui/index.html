@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; script-src 'self'; style-src 'self'; img-src https: http: data:;">
+  <title>Feather</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="tabstrip">
+    <div id="traffic-space"></div>
+    <div id="tabs" role="tablist"></div>
+    <button id="new-tab" class="icon" title="New Tab (⌘T)" aria-label="New Tab">+</button>
+  </div>
+  <div id="toolbar">
+    <button id="back" class="icon" title="Back (⌘[)" aria-label="Back">
+      <svg viewBox="0 0 16 16"><path d="M10 3 5 8l5 5"/></svg>
+    </button>
+    <button id="forward" class="icon" title="Forward (⌘])" aria-label="Forward">
+      <svg viewBox="0 0 16 16"><path d="m6 3 5 5-5 5"/></svg>
+    </button>
+    <button id="reload" class="icon" title="Reload (⌘R)" aria-label="Reload">
+      <svg class="reload" viewBox="0 0 16 16"><path d="M13 8a5 5 0 1 1-1.5-3.6M13 2.5v3h-3"/></svg>
+      <svg class="stop" viewBox="0 0 16 16"><path d="m4 4 8 8M12 4l-8 8"/></svg>
+    </button>
+    <form id="address-form">
+      <span id="secure" aria-hidden="true"></span>
+      <input id="address" type="text" spellcheck="false" autocomplete="off"
+             placeholder="Search or enter address" aria-label="Address">
+    </form>
+    <form id="find-form" hidden>
+      <input id="find" type="search" spellcheck="false" placeholder="Find in page" aria-label="Find in page">
+      <span id="find-count"></span>
+      <button type="button" id="find-close" class="icon" aria-label="Close find">
+        <svg viewBox="0 0 16 16"><path d="m4 4 8 8M12 4l-8 8"/></svg>
+      </button>
+    </form>
+  </div>
+  <script src="ui.js"></script>
+</body>
+</html>

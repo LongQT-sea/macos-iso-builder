@@ -1,0 +1,62 @@
+{
+  "name": "feather-browser",
+  "productName": "Feather",
+  "version": "1.0.0",
+  "description": "A lightweight Chromium-based browser for macOS 10.14 Mojave and later",
+  "main": "main.js",
+  "license": "GPL-3.0-only",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --mac zip dmg --x64 --publish never"
+  },
+  "devDependencies": {
+    "electron": "26.6.10",
+    "electron-builder": "24.13.3"
+  },
+  "build": {
+    "appId": "io.github.feather.browser",
+    "productName": "Feather",
+    "copyright": "GPL-3.0",
+    "files": [
+      "main.js",
+      "preload.js",
+      "ui/**/*",
+      "package.json"
+    ],
+    "electronLanguages": [
+      "en",
+      "en_GB"
+    ],
+    "compression": "maximum",
+    "mac": {
+      "category": "public.app-category.productivity",
+      "minimumSystemVersion": "10.14.0",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "identity": null,
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "extendInfo": {
+        "NSCameraUsageDescription": "Websites may ask to use the camera.",
+        "NSMicrophoneUsageDescription": "Websites may ask to use the microphone.",
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLName": "Web URL",
+            "CFBundleURLSchemes": [
+              "http",
+              "https"
+            ]
+          }
+        ]
+      }
+    },
+    "dmg": {
+      "title": "Feather ${version}"
+    },
+    "artifactName": "Feather-${version}-macOS-${arch}.${ext}",
+    "publish": null
+  }
+}

@@ -106,3 +106,9 @@ Apple for macOS and their update servers, [Mavericks Forever](https://mavericksf
 This tool downloads macOS images directly from Apple's official servers. Users are responsible for complying with [Apple's Software License Agreement](https://www.apple.com/legal/sla/). macOS is a trademark of Apple Inc.
 
 Licensed under GPLv3.
+
+---
+
+## Bonus: Feather, a lightweight Chromium browser for macOS 10.14 Mojave
+
+[`browser/`](browser/) holds **Feather**, a small tabbed browser built on Chromium 116 (Electron 26). It is the newest Chromium that still runs on Mojave. It puts unused background tabs to sleep to save RAM. Build it with the **Build Feather browser (macOS 10.14+)** workflow. See [browser/README.md](browser/README.md).
