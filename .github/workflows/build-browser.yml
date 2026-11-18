@@ -1,0 +1,75 @@
+name: Build Feather browser (macOS 10.14+)
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Optional: tag (e.g., feather-v1.0.0) to publish the build to Releases'
+        required: false
+        type: string
+  push:
+    paths:
+      - 'browser/**'
+      - '.github/workflows/build-browser.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    # Builds an Intel (x86_64) app: macOS 10.14 Mojave only runs on Intel Macs.
+    runs-on: macos-14
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: browser
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: browser/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Build DMG and ZIP
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npm run dist
+
+      - name: Verify bundle
+        run: |
+          set -euo pipefail
+          plist="dist/mac/Feather.app/Contents/Info.plist"
+          minver=$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$plist")
+          echo "LSMinimumSystemVersion: $minver"
+          [ "$minver" = "10.14.0" ]
+          file dist/mac/Feather.app/Contents/MacOS/Feather | tee /dev/stderr | grep -q x86_64
+          ls -lh dist/*.dmg dist/*.zip
+          {
+            echo "### Feather build"
+            echo '| File | Size |'
+            echo '|---|---|'
+            for f in dist/*.dmg dist/*.zip; do echo "| $(basename "$f") | $(du -h "$f" | cut -f1) |"; done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Feather-macOS-x64
+          path: |
+            browser/dist/*.dmg
+            browser/dist/*.zip
+          if-no-files-found: error
+
+      - name: Publish release
+        if: ${{ inputs.release_tag != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.release_tag }}
+        run: |
+          gh release create "$TAG" dist/*.dmg dist/*.zip \
+            --title "Feather $TAG" \
+            --notes "Lightweight Chromium 116 browser for macOS 10.14 Mojave and later (Intel). Unsigned: right-click Feather.app → Open the first time."
